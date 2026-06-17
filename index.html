@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Leitor local para sincronizar EPUBs e audiolivros com ancoras de texto e audio.">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="color-scheme" content="light dark">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="LeMais">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>LeMais</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+    <style type="text/tailwindcss">
+      @theme {
+        --color-brand: #0f766e;
+        --color-brand-strong: #115e59;
+        --color-paper: #fffaf0;
+        --color-night-paper: #111714;
+      }
+
+      @layer base {
+        html {
+          @apply min-h-full bg-slate-50;
+        }
+
+        body {
+          @apply min-h-screen bg-slate-50 text-slate-950 antialiased;
+          display: grid;
+          grid-template-columns: 292px minmax(0, 1fr);
+        }
+
+        body.is-night {
+          @apply bg-slate-950 text-slate-100;
+        }
+
+        button {
+          @apply cursor-pointer disabled:cursor-not-allowed disabled:opacity-55;
+        }
+
+        input,
+        select {
+          @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition focus:border-teal-700 focus:ring-3 focus:ring-teal-700/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100;
+        }
+
+        input[type="range"] {
+          @apply accent-teal-700 shadow-none;
+        }
+      }
+
+      @layer components {
+        .skip-link {
+          @apply absolute left-4 top-3 z-50 -translate-y-32 rounded-lg bg-slate-950 px-3 py-2 font-bold text-white transition focus:translate-y-0;
+        }
+
+        .app-header {
+          @apply sticky top-0 z-20 col-start-1 flex h-screen flex-col gap-4 border-r border-slate-200 bg-white/90 p-4 shadow-none backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90;
+        }
+
+        .app-header > div:first-child {
+          @apply border-b border-slate-200 px-1 pb-4 dark:border-slate-800;
+        }
+
+        .brand-lockup {
+          @apply flex items-center gap-3;
+        }
+
+        .brand-logo {
+          @apply size-12 shrink-0 text-teal-700 dark:text-teal-300;
+        }
+
+        .app-header h1 {
+          @apply text-2xl font-black leading-none tracking-normal text-slate-950 dark:text-white;
+        }
+
+        .eyebrow {
+          @apply mb-1 text-xs font-black uppercase tracking-wide text-teal-700 dark:text-teal-300;
+        }
+
+        .header-controls {
+          @apply mt-auto grid gap-3;
+        }
+
+        .appearance-wrap {
+          @apply relative grid gap-2;
+        }
+
+        .appearance-toggle,
+        .nav-toggle {
+          @apply inline-grid size-10 place-items-center rounded-lg p-0;
+        }
+
+        .appearance-toggle svg,
+        .nav-toggle svg {
+          @apply size-5;
+        }
+
+        .appearance-panel {
+          @apply absolute bottom-full left-0 z-30 mb-2 grid w-56 gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-800 dark:bg-slate-900;
+        }
+
+        .appearance-panel[hidden] {
+          @apply hidden;
+        }
+
+        .compact-control {
+          @apply grid gap-1 text-xs font-bold text-slate-500 dark:text-slate-400;
+        }
+
+        .toggle-control {
+          @apply inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200;
+        }
+
+        .toggle-control input {
+          @apply h-auto w-auto min-h-0 shadow-none;
+        }
+
+        .tabs {
+          @apply grid gap-1;
+        }
+
+        .tabs.is-collapsed {
+          @apply hidden;
+        }
+
+        .tab {
+          @apply inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-left font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white;
+        }
+
+        .tab.is-active {
+          @apply bg-teal-700/10 text-teal-800 dark:bg-teal-300/15 dark:text-teal-200;
+        }
+
+        .tab svg,
+        .secondary-action svg,
+        .primary-action svg,
+        .icon-button svg,
+        .transport-button svg,
+        .play-control svg,
+        .speed-button svg {
+          @apply size-4 shrink-0;
+        }
+
+        main {
+          @apply col-start-2 mx-auto w-full max-w-7xl p-8;
+        }
+
+        .screen {
+          @apply hidden;
+        }
+
+        .screen.is-active {
+          @apply block;
+        }
+
+        .section-heading,
+        .reader-toolbar {
+          @apply mb-5 flex items-end justify-between gap-4;
+        }
+
+        .section-heading h2,
+        .reader-toolbar h2 {
+          @apply text-3xl font-black tracking-normal text-slate-950 md:text-5xl dark:text-white;
+        }
+
+        .library-actions,
+        .import-actions,
+        .player-actions,
+        .reader-controls {
+          @apply flex flex-wrap items-center gap-2;
+        }
+
+        .primary-action {
+          @apply min-h-10 rounded-lg border border-teal-800 bg-teal-700 px-4 py-2 font-black text-white shadow-sm transition hover:bg-teal-800;
+        }
+
+        .secondary-action,
+        .icon-button {
+          @apply min-h-10 rounded-lg border border-slate-300 bg-white px-4 py-2 font-black text-slate-950 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800;
+        }
+
+        .icon-button {
+          @apply w-12 px-0;
+        }
+
+        .transport-button {
+          @apply relative grid size-12 place-items-center rounded-full border border-slate-200 bg-slate-100 p-0 text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:text-slate-950 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-700 dark:hover:text-white;
+        }
+
+        .transport-button svg {
+          @apply size-5;
+        }
+
+        .control-badge {
+          @apply absolute -bottom-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-white px-1 text-[10px] font-black leading-none text-slate-700 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-200 dark:ring-slate-700;
+        }
+
+        .play-control {
+          @apply grid size-14 place-items-center rounded-full border border-teal-800 bg-teal-700 p-0 text-white shadow-lg shadow-teal-950/15 transition hover:-translate-y-0.5 hover:bg-teal-800 dark:border-teal-500 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400;
+        }
+
+        .play-control svg {
+          @apply size-6;
+        }
+
+        .speed-button {
+          @apply inline-flex min-h-10 w-auto items-center justify-center gap-2 rounded-full px-3 text-sm tabular-nums;
+        }
+
+        .sleep-button {
+          @apply inline-flex min-h-10 min-w-24 items-center justify-center gap-2 rounded-full px-3 text-sm tabular-nums;
+        }
+
+        .status-pill {
+          @apply inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-bold text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400;
+        }
+
+        .library-layout {
+          @apply grid grid-cols-[18rem_minmax(0,1fr)] items-start gap-4;
+        }
+
+        .library-current,
+        .book-card,
+        .sync-workbench,
+        .anchor-list-wrap,
+        .player-panel,
+        .now-reading,
+        .reader-shell,
+        .drop-zone,
+        .import-summary {
+          @apply rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900;
+        }
+
+        .library-current {
+          @apply sticky top-8 p-4;
+        }
+
+        .book-cover,
+        .book-cover-fallback {
+          @apply mb-4 aspect-[2/3] w-full rounded-2xl border border-slate-200 bg-slate-100 object-cover shadow-sm dark:border-slate-800 dark:bg-slate-950;
+        }
+
+        .book-cover-fallback {
+          @apply grid place-items-center text-3xl font-black text-slate-400;
+        }
+
+        .library-current p:last-child,
+        .book-card p,
+        .now-reading p:last-child {
+          @apply text-sm leading-6 text-slate-500 dark:text-slate-400;
+        }
+
+        .library-list {
+          @apply grid gap-3;
+        }
+
+        .book-card {
+          @apply grid grid-cols-[4.75rem_minmax(0,1fr)_auto] items-center gap-4 p-3 transition hover:-translate-y-0.5 hover:border-teal-700/40 hover:shadow-lg;
+        }
+
+        .book-card h3 {
+          @apply text-base font-black text-slate-950 dark:text-white;
+        }
+
+        .book-card-cover,
+        .book-card-fallback {
+          @apply aspect-[2/3] w-19 rounded-xl border border-slate-200 bg-slate-100 object-cover dark:border-slate-800 dark:bg-slate-950;
+        }
+
+        .book-card-fallback {
+          @apply grid place-items-center font-black text-slate-400;
+        }
+
+        .book-card-actions {
+          @apply flex flex-wrap justify-end gap-2;
+        }
+
+        .empty-state {
+          @apply grid min-h-48 place-items-center rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400;
+        }
+
+        .upload-grid {
+          @apply grid grid-cols-3 gap-4;
+        }
+
+        .drop-zone {
+          @apply grid min-h-52 content-center p-5 transition hover:-translate-y-0.5 hover:border-teal-700 hover:shadow-lg;
+        }
+
+        .drop-zone input[type="file"] {
+          @apply absolute size-px opacity-0;
+        }
+
+        .drop-icon {
+          @apply mb-4 grid size-12 place-items-center rounded-xl bg-teal-50 font-black text-teal-800 dark:bg-teal-950 dark:text-teal-200;
+        }
+
+        .drop-title {
+          @apply mb-2 block text-xl font-black text-slate-950 dark:text-white;
+        }
+
+        .file-name {
+          @apply text-sm font-semibold text-slate-500 dark:text-slate-400;
+        }
+
+        .book-title-field,
+        label {
+          @apply grid gap-1 text-sm font-bold text-slate-500 dark:text-slate-400;
+        }
+
+        .book-title-field {
+          @apply mt-4;
+        }
+
+        .import-actions {
+          @apply my-4;
+        }
+
+        .import-summary {
+          @apply grid grid-cols-3 divide-x divide-slate-200 overflow-hidden dark:divide-slate-800;
+        }
+
+        .import-summary > div {
+          @apply grid min-h-24 gap-1 p-4;
+        }
+
+        .metric-value {
+          @apply text-3xl font-black text-slate-950 dark:text-white;
+        }
+
+        .metric-label {
+          @apply text-sm font-bold text-slate-500 dark:text-slate-400;
+        }
+
+        .sync-layout {
+          @apply grid grid-cols-[minmax(0,1fr)_20rem] items-start gap-4;
+        }
+
+        .sync-workbench,
+        .anchor-list-wrap,
+        .player-panel,
+        .now-reading,
+        .reader-shell {
+          @apply p-4;
+        }
+
+        .mini-player {
+          @apply mb-4 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3;
+        }
+
+        audio {
+          @apply w-full;
+        }
+
+        .anchor-editor {
+          @apply mb-4 grid grid-cols-[10rem_9rem_minmax(0,1fr)] gap-3;
+        }
+
+        .range-row {
+          @apply my-3 grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-3;
+        }
+
+        .reader-preview,
+        .reader-page {
+          @apply font-serif leading-8 text-slate-900 dark:text-amber-50;
+          font-size: var(--reader-font-size);
+        }
+
+        .reader-preview {
+          @apply max-h-88 min-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950;
+        }
+
+        .anchor-list {
+          @apply grid gap-3 pl-5;
+        }
+
+        .anchor-list-wrap h3 {
+          @apply mb-3 font-black text-slate-950 dark:text-white;
+        }
+
+        .anchor-list li {
+          @apply rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950;
+        }
+
+        .anchor-item-head {
+          @apply flex justify-between gap-3 font-black text-slate-950 dark:text-white;
+        }
+
+        .anchor-item-note {
+          @apply mt-2 text-sm text-slate-500 dark:text-slate-400;
+        }
+
+        .anchor-remove {
+          @apply mt-2 border-0 bg-transparent p-0 font-black text-red-700 dark:text-red-400;
+        }
+
+        .listen-layout {
+          @apply grid grid-cols-[minmax(0,1fr)_22rem] gap-4;
+        }
+
+        .player-panel > audio {
+          @apply hidden;
+        }
+
+        .time-row,
+        .reader-footer {
+          @apply my-4 grid grid-cols-[4.8rem_minmax(0,1fr)_4.8rem] items-center gap-3 font-black tabular-nums text-slate-500 dark:text-slate-400;
+        }
+
+        .player-actions {
+          @apply inline-flex items-center gap-3;
+        }
+
+        .reader-shell {
+          @apply flex min-h-[calc(100svh-4rem)] flex-col;
+        }
+
+        .reader-toolbar {
+          @apply mb-3 grid grid-cols-[auto_minmax(8rem,1fr)_auto] items-center gap-3 border-b border-slate-200 pb-3 dark:border-slate-800;
+        }
+
+        .reader-cover {
+          @apply aspect-[2/3] w-10 rounded-lg border border-slate-200 bg-slate-100 object-cover dark:border-slate-800 dark:bg-slate-950;
+        }
+
+        .reader-title {
+          @apply flex min-w-0 items-center gap-3;
+        }
+
+        .reader-title-text {
+          @apply min-w-0;
+        }
+
+        .reader-title-text .eyebrow {
+          @apply mb-0;
+        }
+
+        .reader-title-text h2 {
+          @apply truncate text-lg font-black tracking-normal md:text-xl;
+        }
+
+        .reader-section-select {
+          @apply min-w-0;
+        }
+
+        .reader-controls select {
+          @apply max-w-72;
+        }
+
+        .reader-controls {
+          @apply flex-nowrap justify-end gap-2;
+        }
+
+        .reader-controls .icon-button,
+        .reader-controls .play-control {
+          @apply size-10 min-h-10;
+        }
+
+        .reader-controls .speed-button {
+          @apply min-h-10 px-3;
+        }
+
+        .reader-page {
+          @apply relative mx-auto flex h-[calc(100svh-13.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border-0 bg-amber-50 p-8 shadow-none dark:bg-night-paper;
+          font-size: calc(var(--reader-font-size) * var(--reader-fit-scale, 1));
+        }
+
+        .reader-page h3,
+        .reader-preview h3 {
+          @apply mb-3 font-sans text-lg font-black;
+        }
+
+        .reader-page p,
+        .reader-preview p {
+          @apply mb-3;
+        }
+
+        .reader-tap-zone {
+          @apply absolute top-0 bottom-0 z-10 w-1/3 border-0 bg-transparent p-0 opacity-0;
+        }
+
+        .reader-tap-zone:focus-visible {
+          @apply opacity-100;
+          background: rgb(15 118 110 / 0.08);
+        }
+
+        .reader-tap-zone.is-left {
+          @apply left-0;
+        }
+
+        .reader-tap-zone.is-right {
+          @apply right-0;
+        }
+
+        .toast {
+          @apply fixed bottom-4 left-1/2 z-50 min-h-11 w-[min(32rem,calc(100vw-2rem))] translate-y-32 -translate-x-1/2 rounded-xl bg-slate-950 px-4 py-3 text-white shadow-xl transition dark:bg-white dark:text-slate-950;
+        }
+
+        .toast.is-visible {
+          @apply translate-y-0;
+        }
+      }
+
+      @media (max-width: 1040px) {
+        body,
+        body.is-nav-collapsed {
+          display: block;
+        }
+
+        .app-header {
+          @apply static h-auto border-r-0 border-b p-4;
+        }
+
+        main {
+          @apply p-4;
+        }
+
+        .library-current {
+          @apply static;
+        }
+
+        .listen-layout,
+        .library-layout,
+        .sync-layout,
+        .upload-grid,
+        .anchor-editor,
+        .import-summary {
+          @apply grid-cols-1;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .section-heading {
+          @apply items-stretch;
+        }
+
+        .library-actions {
+          @apply justify-stretch;
+        }
+
+        .library-actions > button,
+        .reader-section-select {
+          @apply w-full max-w-none;
+        }
+
+        .reader-toolbar {
+          @apply grid-cols-[auto_minmax(0,1fr)] items-center;
+        }
+
+        .reader-controls {
+          @apply col-span-full w-full justify-start overflow-x-auto pb-1;
+        }
+
+        .reader-page {
+          @apply h-[calc(100svh-14.5rem)] p-5;
+        }
+
+        .book-card {
+          @apply grid-cols-[4rem_minmax(0,1fr)];
+        }
+
+        .book-card-actions {
+          @apply col-span-full justify-stretch;
+        }
+
+        .library-current {
+          @apply grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-4;
+        }
+
+        .library-current .eyebrow,
+        .library-current h3,
+        .library-current p {
+          @apply col-start-2;
+        }
+
+        .library-current .book-cover {
+          @apply col-start-1 row-span-3 mb-0 w-18 rounded-xl;
+        }
+
+        .book-card-actions > button,
+        .library-actions > button {
+          @apply flex-1;
+        }
+
+        .mini-player,
+        .time-row,
+        .reader-footer,
+        .range-row,
+        .player-actions {
+          @apply grid-cols-1;
+        }
+
+        .icon-button {
+          @apply w-full;
+        }
+
+        .player-actions {
+          @apply w-full justify-center;
+        }
+      }
+    </style>
+    <script src="./vendor/tailwindcss-browser.js"></script>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Pular para o conteúdo</a>
+
+    <header class="app-header">
+      <div>
+        <div class="brand-lockup" aria-label="LeMais">
+          <svg class="brand-logo" viewBox="0 0 48 48" role="img" aria-label="Logo LeMais">
+            <path d="M8 11.5C8 8.5 10.4 6 13.4 6H22c5.5 0 10 4.5 10 10v26H18C12.5 42 8 37.5 8 32V11.5Z" fill="currentColor" opacity="0.18"/>
+            <path d="M16 10h8c6.6 0 12 5.4 12 12v20H24c-6.6 0-12-5.4-12-12V14c0-2.2 1.8-4 4-4Z" fill="currentColor"/>
+            <path d="M21 19h9M21 25h9M21 31h5" stroke="white" stroke-width="3" stroke-linecap="round"/>
+            <path d="M34 8v9l6-3.6L46 17V8c0-1.1-.9-2-2-2h-8c-1.1 0-2 .9-2 2Z" fill="#c65f2b"/>
+          </svg>
+          <div>
+            <p class="eyebrow">LeMais</p>
+            <h1>Leitor sincronizado</h1>
+          </div>
+        </div>
+      </div>
+      <div class="header-controls" aria-label="Preferências">
+        <div class="appearance-wrap">
+          <button class="secondary-action appearance-toggle" type="button" id="appearance-toggle" aria-expanded="false" aria-controls="appearance-panel" aria-label="Aparência" title="Aparência">
+            <i data-lucide="palette" aria-hidden="true"></i>
+            <span class="visually-hidden">Aparência</span>
+          </button>
+          <div class="appearance-panel" id="appearance-panel" hidden>
+            <label class="compact-control">
+              Fonte
+              <input id="font-size-input" type="range" min="16" max="26" value="18">
+            </label>
+            <label class="toggle-control">
+              <input id="night-mode-toggle" type="checkbox">
+              <span>Noturno</span>
+            </label>
+          </div>
+        </div>
+        <button class="secondary-action nav-toggle" type="button" id="nav-toggle" aria-expanded="true" aria-controls="app-tabs" aria-label="Recolher menu" title="Recolher menu">
+          <i data-lucide="panel-left-close" aria-hidden="true"></i>
+          <span class="visually-hidden">Recolher menu</span>
+        </button>
+      </div>
+      <nav class="tabs" id="app-tabs" aria-label="Telas">
+        <button class="tab is-active" type="button" data-screen-target="library"><i data-lucide="library" aria-hidden="true"></i><span>Biblioteca</span></button>
+        <button class="tab" type="button" data-screen-target="upload"><i data-lucide="upload" aria-hidden="true"></i><span>Importar</span></button>
+        <button class="tab" type="button" data-screen-target="sync"><i data-lucide="git-compare-arrows" aria-hidden="true"></i><span>Sincronizar</span></button>
+        <button class="tab" type="button" data-screen-target="listen"><i data-lucide="headphones" aria-hidden="true"></i><span>Ouvir</span></button>
+        <button class="tab" type="button" data-screen-target="read"><i data-lucide="book-open-text" aria-hidden="true"></i><span>Ler</span></button>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="screen is-active" id="screen-library" aria-labelledby="library-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Biblioteca</p>
+            <h2 id="library-title">Livros ancorados</h2>
+          </div>
+          <div class="library-actions">
+            <button class="secondary-action" type="button" id="export-db-button">Exportar banco</button>
+            <button class="secondary-action" type="button" id="import-db-button">Importar banco</button>
+            <input id="import-db-input" type="file" accept="application/json,.json" hidden>
+            <input id="cover-repair-input" type="file" accept=".epub,application/epub+zip" hidden>
+            <button class="primary-action" type="button" data-screen-target="upload">Importar livro</button>
+          </div>
+        </div>
+
+        <div class="library-layout">
+          <div class="library-current">
+            <img class="book-cover" id="current-book-cover" alt="" hidden>
+            <p class="eyebrow">Livro aberto</p>
+            <h3 id="current-book-title">Nenhum livro aberto</h3>
+            <p id="current-book-meta">Importe um MP3, um EPUB e uma legenda VTT para criar âncoras automaticamente.</p>
+          </div>
+          <div class="library-list" id="library-list" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-upload" aria-labelledby="upload-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Importação</p>
+            <h2 id="upload-title">Arquivos do livro</h2>
+          </div>
+          <span class="status-pill" id="import-status">Aguardando arquivos</span>
+        </div>
+
+        <div class="upload-grid">
+          <label class="drop-zone" for="audio-input">
+            <span class="drop-icon" aria-hidden="true">♪</span>
+            <span class="drop-title">Audiolivro MP3</span>
+            <span class="file-name" id="audio-file-name">Nenhum arquivo</span>
+            <input id="audio-input" type="file" accept="audio/mpeg,audio/mp3,audio/*">
+          </label>
+
+          <label class="drop-zone" for="epub-input">
+            <span class="drop-icon" aria-hidden="true">Aa</span>
+            <span class="drop-title">Livro EPUB</span>
+            <span class="file-name" id="epub-file-name">Nenhum arquivo</span>
+            <input id="epub-input" type="file" accept=".epub,application/epub+zip">
+          </label>
+
+          <label class="drop-zone" for="vtt-input">
+            <span class="drop-icon" aria-hidden="true">CC</span>
+            <span class="drop-title">Legenda VTT</span>
+            <span class="file-name" id="vtt-file-name">Nenhum arquivo</span>
+            <input id="vtt-input" type="file" accept=".vtt,text/vtt">
+          </label>
+        </div>
+
+        <label class="book-title-field">
+          Nome na biblioteca
+          <input id="book-title-input" type="text" placeholder="Ex.: O homem bicentenário">
+        </label>
+
+        <div class="import-actions">
+          <button class="primary-action" type="button" id="parse-epub-button">Preparar livro</button>
+          <button class="primary-action" type="button" id="auto-anchor-button">Ancorar e salvar</button>
+          <button class="secondary-action" type="button" id="clear-button">Limpar importação</button>
+        </div>
+
+        <div class="import-summary" aria-live="polite">
+          <div>
+            <span class="metric-value" id="chapter-count">0</span>
+            <span class="metric-label">capítulos</span>
+          </div>
+          <div>
+            <span class="metric-value" id="audio-duration">00:00</span>
+            <span class="metric-label">áudio</span>
+          </div>
+          <div>
+            <span class="metric-value" id="anchor-count">0</span>
+            <span class="metric-label">âncoras</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-sync" aria-labelledby="sync-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Sincronização</p>
+            <h2 id="sync-title">Âncoras confirmadas</h2>
+          </div>
+          <button class="primary-action" type="button" id="add-anchor-button">Criar âncora</button>
+        </div>
+
+        <div class="sync-layout">
+          <div class="sync-workbench">
+            <div class="mini-player">
+              <button class="transport-button" id="sync-backward" type="button" aria-label="Voltar 15 segundos" title="Voltar 15 segundos">
+                <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+                <span class="control-badge" aria-hidden="true">15</span>
+                <span class="visually-hidden">Voltar 15 segundos</span>
+              </button>
+              <audio id="sync-audio" controls preload="metadata"></audio>
+              <button class="transport-button" id="sync-forward" type="button" aria-label="Avançar 15 segundos" title="Avançar 15 segundos">
+                <i data-lucide="rotate-cw" aria-hidden="true"></i>
+                <span class="control-badge" aria-hidden="true">15</span>
+                <span class="visually-hidden">Avançar 15 segundos</span>
+              </button>
+            </div>
+
+            <div class="anchor-editor">
+              <label>
+                Tempo do áudio
+                <input id="anchor-time" type="text" inputmode="numeric" placeholder="00:00:00">
+              </label>
+              <label>
+                Posição do texto
+                <input id="anchor-progress" type="number" min="0" max="100" step="0.01" value="0">
+              </label>
+              <label>
+                Nota
+                <input id="anchor-note" type="text" placeholder="Ex.: início do capítulo 3">
+              </label>
+            </div>
+
+            <div class="reading-picker">
+              <label for="sync-chapter-select">Capítulo</label>
+              <select id="sync-chapter-select"></select>
+              <div class="range-row">
+                <label for="sync-position">Trecho</label>
+                <input id="sync-position" type="range" min="0" max="0" value="0">
+              </div>
+              <article class="reader-preview" id="sync-preview" tabindex="0"></article>
+            </div>
+          </div>
+
+          <aside class="anchor-list-wrap" aria-labelledby="anchor-list-title">
+            <h3 id="anchor-list-title">Lista de âncoras</h3>
+            <ol class="anchor-list" id="anchor-list"></ol>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-listen" aria-labelledby="listen-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Player</p>
+            <h2 id="listen-title">Ouvir audiolivro</h2>
+          </div>
+          <button class="secondary-action" type="button" data-screen-target="read">Abrir leitura</button>
+        </div>
+
+        <div class="listen-layout">
+          <div class="player-panel">
+            <audio id="main-audio" controls preload="metadata"></audio>
+            <div class="time-row">
+              <span id="main-current-time">00:00</span>
+              <input id="audio-seek" type="range" min="0" max="0" value="0" aria-label="Posição do áudio">
+              <span id="main-duration">00:00</span>
+            </div>
+            <div class="player-actions">
+              <button class="transport-button" id="backward-button" type="button" aria-label="Voltar 15 segundos" title="Voltar 15 segundos">
+                <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+                <span class="control-badge" aria-hidden="true">15</span>
+                <span class="visually-hidden">Voltar 15 segundos</span>
+              </button>
+              <button class="play-control" id="play-toggle" type="button" aria-label="Reproduzir" title="Reproduzir">
+                <i data-lucide="play" aria-hidden="true"></i>
+                <span class="visually-hidden">Reproduzir</span>
+              </button>
+              <button class="secondary-action speed-button" id="main-speed-button" type="button" aria-label="Alterar velocidade do áudio" title="Velocidade 1×">
+                <i data-lucide="gauge" aria-hidden="true"></i>
+                <span>1×</span>
+              </button>
+              <button class="secondary-action sleep-button" id="sleep-timer-button" type="button" aria-label="Timer de sono desligado" title="Timer de sono">
+                <i data-lucide="moon" aria-hidden="true"></i>
+                <span id="sleep-timer-label">Timer</span>
+              </button>
+              <button class="transport-button" id="forward-button" type="button" aria-label="Avançar 15 segundos" title="Avançar 15 segundos">
+                <i data-lucide="rotate-cw" aria-hidden="true"></i>
+                <span class="control-badge" aria-hidden="true">15</span>
+                <span class="visually-hidden">Avançar 15 segundos</span>
+              </button>
+            </div>
+          </div>
+
+          <aside class="now-reading">
+            <p class="eyebrow">Estimativa</p>
+            <h3 id="listen-chapter">Sem capítulo</h3>
+            <p id="listen-excerpt">Importe um EPUB e crie ao menos duas âncoras para melhorar a estimativa.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-read" aria-labelledby="read-title">
+        <div class="reader-shell">
+          <div class="reader-toolbar">
+            <div class="reader-title">
+              <img class="reader-cover" id="reader-book-cover" alt="" hidden>
+              <div class="reader-title-text">
+                <p class="eyebrow">Leitor</p>
+                <h2 id="read-title">Ler livro</h2>
+              </div>
+            </div>
+            <select class="reader-section-select" id="read-chapter-select" aria-label="Capítulo"></select>
+            <div class="reader-controls">
+              <button class="play-control" id="reader-play-toggle" type="button" aria-label="Reproduzir" title="Reproduzir">
+                <i data-lucide="play" aria-hidden="true"></i>
+                <span class="visually-hidden">Reproduzir</span>
+              </button>
+              <button class="secondary-action speed-button" id="reader-speed-button" type="button" aria-label="Alterar velocidade do áudio" title="Velocidade 1×">
+                <i data-lucide="gauge" aria-hidden="true"></i>
+                <span>1×</span>
+              </button>
+              <button class="icon-button" id="reader-sync-button" type="button" aria-label="Sincronizar áudio com esta página" title="Sincronizar áudio com esta página">
+                <i data-lucide="refresh-cw" aria-hidden="true"></i>
+              </button>
+              <button class="icon-button" type="button" data-screen-target="listen" aria-label="Abrir áudio" title="Abrir áudio">
+                <i data-lucide="headphones" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+
+          <article class="reader-page" id="reader-page" tabindex="0" aria-label="Página de leitura"></article>
+
+          <div class="reader-footer">
+            <span id="read-progress-label">0%</span>
+            <input id="read-position" type="range" min="0" max="0" value="0" aria-label="Posição do texto">
+            <span id="estimated-audio-label">00:00</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./vendor/jszip.min.js"></script>
+    <script src="./vendor/lucide.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
